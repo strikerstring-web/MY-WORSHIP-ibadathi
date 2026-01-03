@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, UserProfile, UserData, Language, PrayerStatus, DhikrChallenge, PrayerTimings } from './types';
 import { TRANSLATIONS, PRAYERS } from './constants';
@@ -147,6 +148,21 @@ const App: React.FC = () => {
     });
   };
 
+  // Added updatePrayerReminder to fix missing prop in MyAccount
+  const updatePrayerReminder = (prayer: string, time: string, enabled: boolean) => {
+    updateActiveUser(u => {
+      const reminders = u.settings.prayerReminders || [];
+      const index = reminders.findIndex(r => r.prayer === prayer);
+      const newReminders = [...reminders];
+      if (index > -1) {
+        newReminders[index] = { prayer, time, enabled };
+      } else {
+        newReminders.push({ prayer, time, enabled });
+      }
+      return { ...u, settings: { ...u.settings, prayerReminders: newReminders } };
+    });
+  };
+
   const handleLogin = (profile: UserProfile, isNew: boolean) => {
     const userKey = profile.username.toLowerCase();
     if (isNew) {
@@ -242,7 +258,8 @@ const App: React.FC = () => {
           </div>
         </div>
       );
-      case 'account': return <MyAccount state={compositeData} setCurrentView={setSubView} t={t} onLogout={() => setState(prev => ({ ...prev, currentUser: null }))} toggleTheme={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, theme: u.settings.theme === 'dark' ? 'light' : 'dark' } }))} toggleEcoMode={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, ecoMode: !u.settings.ecoMode } }))} toggleNotifications={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, notificationsEnabled: !u.settings.notificationsEnabled } }))} />;
+      // Updated: Pass updatePrayerReminder to MyAccount
+      case 'account': return <MyAccount state={compositeData} setCurrentView={setSubView} t={t} onLogout={() => setState(prev => ({ ...prev, currentUser: null }))} toggleTheme={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, theme: u.settings.theme === 'dark' ? 'light' : 'dark' } }))} toggleEcoMode={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, ecoMode: !u.settings.ecoMode } }))} toggleNotifications={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, notificationsEnabled: !u.settings.notificationsEnabled } }))} updatePrayerReminder={updatePrayerReminder} />;
       default: return null;
     }
   };

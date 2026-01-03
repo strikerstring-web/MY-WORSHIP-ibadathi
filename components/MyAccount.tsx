@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { UserData, PrayerStatus, PrayerReminder, FastingLog } from '../types';
 import { PRAYERS } from '../constants';
@@ -9,12 +10,14 @@ interface MyAccountProps {
   onLogout: () => void;
   toggleTheme: () => void;
   toggleEcoMode: () => void;
+  // Added toggleNotifications to fix type error in App.tsx
+  toggleNotifications: () => void;
   updatePrayerReminder: (prayer: string, time: string, enabled: boolean) => void;
 }
 
 type Period = 'weekly' | 'monthly' | 'yearly';
 
-const MyAccount: React.FC<MyAccountProps> = ({ state, setCurrentView, t, onLogout, toggleTheme, toggleEcoMode, updatePrayerReminder }) => {
+const MyAccount: React.FC<MyAccountProps> = ({ state, setCurrentView, t, onLogout, toggleTheme, toggleEcoMode, toggleNotifications, updatePrayerReminder }) => {
   const [activePeriod, setActivePeriod] = useState<Period>('weekly');
 
   const stats = useMemo(() => {
@@ -231,6 +234,22 @@ const MyAccount: React.FC<MyAccountProps> = ({ state, setCurrentView, t, onLogou
             </div>
             <div className={`w-12 h-6 rounded-full p-1 transition-colors ${isDark ? 'bg-indigo-600' : 'bg-amber-500'}`}>
                <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isDark ? 'translate-x-6' : 'translate-x-0'}`}></div>
+            </div>
+         </button>
+
+         {/* Added Notifications Toggle button */}
+         <button onClick={toggleNotifications} className="card-premium w-full flex items-center justify-between !p-6 mb-3">
+            <div className="flex items-center gap-5">
+               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all ${state.settings.notificationsEnabled ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-400'}`}>
+                 <i className={`fas ${state.settings.notificationsEnabled ? 'fa-bell' : 'fa-bell-slash'}`}></i>
+               </div>
+               <div className="text-left">
+                 <span className="font-black text-sm text-emerald-950 dark:text-white">Notifications</span>
+                 <p className="text-[9px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-widest mt-0.5">Push Alerts</p>
+               </div>
+            </div>
+            <div className={`w-12 h-6 rounded-full p-1 transition-colors ${state.settings.notificationsEnabled ? 'bg-emerald-600' : 'bg-slate-200 dark:bg-white/10'}`}>
+               <div className={`w-4 h-4 bg-white rounded-full transition-transform ${state.settings.notificationsEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
             </div>
          </button>
 
