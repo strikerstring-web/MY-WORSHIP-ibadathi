@@ -22,14 +22,44 @@ const Login: React.FC<LoginProps> = ({ onLogin, t, initialLanguage, users, initi
     password: '',
     preferredLanguage: initialLanguage
   });
+  
   const [error, setError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   const usernameNormalized = useMemo(() => formData.username.trim().toLowerCase(), [formData.username]);
+
+  // Real-time Availability Check
+  useEffect(() => {
+    if (mode === 'register' && usernameNormalized.length >= 3) {
+      setAvailability('checking');
+      const timeoutId = setTimeout(() => {
+        if (users[usernameNormalized]) {
+          setAvailability('taken');
+          // Generate 2 simple suggestions
+          setSuggestions([
+            `${usernameNormalized}${Math.floor(Math.random() * 99 + 1)}`,
+            `${usernameNormalized}_${new Date().getFullYear().toString().slice(-2)}`
+          ]);
+        } else {
+          setAvailability('available');
+          setSuggestions([]);
+        }
+      }, 400); // Debounce
+      return () => clearTimeout(timeoutId);
+    } else {
+      setAvailability('idle');
+      setSuggestions([]);
+    }
+  }, [usernameNormalized, mode, users]);
   
   const validate = () => {
     if (!usernameNormalized) return "Username required.";
+    if (usernameNormalized.length < 3) return "Username must be at least 3 characters.";
     if (!formData.password) return "Password required.";
+    
     if (mode === 'register') {
+      if (availability === 'taken') return "Please choose a different username.";
       if (!formData.name.trim()) return "Full name required.";
       if (!formData.age || isNaN(parseInt(formData.age))) return "Valid age required.";
       if (!formData.place.trim()) return "Place required.";
@@ -48,6 +78,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, t, initialLanguage, users, initi
     }
 
     setIsAuthenticating(true);
+    // Simulate auth delay
     setTimeout(() => {
       if (mode === 'login') {
         const user = users[usernameNormalized];
@@ -73,6 +104,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, t, initialLanguage, users, initi
     }, 800);
   };
 
+  const applySuggestion = (s: string) => {
+    setFormData(prev => ({ ...prev, username: s }));
+  };
+
   const inputClasses = "w-full px-6 py-4 bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-2xl focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-bold text-emerald-950 dark:text-emerald-50 text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500";
   const labelClasses = "block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2";
 
@@ -96,13 +131,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, t, initialLanguage, users, initi
 
           <div className="flex bg-black/5 dark:bg-white/5 p-1 rounded-2xl mb-8 border border-black/5 dark:border-white/10">
             <button 
-              onClick={() => setMode('login')} 
+              onClick={() => { setMode('login'); setError(null); }} 
               className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'login' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}
             >
               Login
             </button>
             <button 
-              onClick={() => setMode('register')} 
+              onClick={() => { setMode('register'); setError(null); }} 
               className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'register' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500'}`}
             >
               Register
@@ -117,7 +152,19 @@ const Login: React.FC<LoginProps> = ({ onLogin, t, initialLanguage, users, initi
             )}
 
             <div className="space-y-2">
-              <label className={labelClasses}>Username</label>
+              <div className="flex justify-between items-center">
+                <label className={labelClasses}>Username</label>
+                {mode === 'register' && availability !== 'idle' && usernameNormalized.length >= 3 && (
+                  <span className={`text-[8px] font-black uppercase tracking-widest transition-colors ${
+                    availability === 'checking' ? 'text-slate-400' : 
+                    availability === 'available' ? 'text-emerald-500' : 'text-rose-500'
+                  }`}>
+                    {availability === 'checking' && <i className="fas fa-spinner fa-spin mr-1"></i>}
+                    {availability === 'available' && <><i className="fas fa-check-circle mr-1"></i> {t('usernameAvailable')}</>}
+                    {availability === 'taken' && <><i className="fas fa-times-circle mr-1"></i> {t('usernameTaken')}</>}
+                  </span>
+                )}
+              </div>
               <input 
                 type="text" 
                 placeholder="e.g. believer_1"
@@ -126,6 +173,21 @@ const Login: React.FC<LoginProps> = ({ onLogin, t, initialLanguage, users, initi
                 onChange={e => setFormData({...formData, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '')})} 
                 required 
               />
+              {mode === 'register' && availability === 'taken' && suggestions.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-1 animate-fade-in">
+                  <span className="text-[9px] font-bold text-slate-400">{t('suggestions')}</span>
+                  {suggestions.map(s => (
+                    <button 
+                      key={s} 
+                      type="button" 
+                      onClick={() => applySuggestion(s)}
+                      className="px-2 py-0.5 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black rounded-lg border border-emerald-500/20 hover:bg-emerald-500 hover:text-white transition-colors"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {mode === 'register' && (
@@ -168,8 +230,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, t, initialLanguage, users, initi
 
             <button 
               type="submit"
-              disabled={isAuthenticating}
-              className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl transition-all active:scale-95 uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/20 mt-8"
+              disabled={isAuthenticating || (mode === 'register' && availability === 'checking')}
+              className={`w-full bg-emerald-600 text-white font-black py-5 rounded-2xl transition-all active:scale-95 uppercase tracking-widest text-xs flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/20 mt-8 ${
+                (isAuthenticating || (mode === 'register' && availability === 'checking')) ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
             >
               {isAuthenticating ? (
                 <i className="fas fa-spinner fa-spin"></i>
