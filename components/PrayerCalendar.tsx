@@ -11,13 +11,8 @@ interface PrayerCalendarProps {
 
 const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStatus, setCurrentView, t }) => {
   const [viewDate, setViewDate] = useState(new Date());
-  const [isClient, setIsClient] = useState(false);
   const [selectedDateStr, setSelectedDateStr] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [activeEditingPrayer, setActiveEditingPrayer] = useState<string | null>(null);
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   const month = viewDate.getMonth();
   const year = viewDate.getFullYear();
@@ -54,14 +49,6 @@ const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStat
       quranDone,
       excused
     };
-  };
-
-  const getHijriDay = (date: string) => {
-    if (!isClient) return '';
-    try {
-      const formatter = new Intl.DateTimeFormat('en-u-ca-islamic-uma-nu-latn', { day: 'numeric' });
-      return formatter.format(new Date(date));
-    } catch (e) { return ''; }
   };
 
   const selectedData = useMemo(() => getDayWorshipData(selectedDateStr), [selectedDateStr, state]);
@@ -118,8 +105,7 @@ const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStat
             {days.map(d => {
               const data = getDayWorshipData(d);
               const isSelected = selectedDateStr === d;
-              const isToday = isClient && d === new Date().toISOString().split('T')[0];
-              const hDay = getHijriDay(d);
+              const isToday = d === new Date().toISOString().split('T')[0];
               
               return (
                 <button 
@@ -142,7 +128,6 @@ const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStat
                   }`}>
                     {d.split('-')[2]}
                   </span>
-                  <span className="text-[7px] font-bold text-slate-400 opacity-60 mb-1">{hDay}</span>
                   
                   {/* Activity Markers */}
                   <div className="flex flex-wrap justify-center gap-[2px] w-full px-1">

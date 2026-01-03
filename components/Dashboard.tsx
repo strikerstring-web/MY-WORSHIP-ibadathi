@@ -12,33 +12,14 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ state, setCurrentView, t, updatePrayerStatus, onLogout }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
 
   const todayStr = useMemo(() => currentTime.toISOString().split('T')[0], [currentTime]);
   const logs = useMemo(() => state.prayerLogs[todayStr] || { fajr: 'pending', dhuhr: 'pending', asr: 'pending', maghrib: 'pending', isha: 'pending' }, [state.prayerLogs, todayStr]);
-
-  // Safe client-only Hijri calculation
-  const hijriData = useMemo(() => {
-    if (!isClient) return { full: '---' };
-    try {
-      const locale = 'en-u-ca-islamic-uma-nu-latn';
-      const formatter = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' });
-      const parts = formatter.formatToParts(currentTime);
-      const day = parts.find(p => p.type === 'day')?.value;
-      const month = parts.find(p => p.type === 'month')?.value;
-      const year = parts.find(p => p.type === 'year')?.value;
-      // Format: "14 Rajab, 1447 AH"
-      return { full: `${day} ${month}, ${year} AH` };
-    } catch (e) {
-      return { full: '---' };
-    }
-  }, [currentTime, isClient]);
 
   const dailyHadith = useMemo(() => {
     const start = new Date(currentTime.getFullYear(), 0, 0);
@@ -64,7 +45,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setCurrentView, t, updateP
 
   return (
     <div className="scroll-container px-5 pt-8 content-limit w-full">
-      {/* Header & Hijri Date */}
+      {/* Header & Date */}
       <div className="flex flex-col gap-6 mb-8 animate-fade-up">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -81,7 +62,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setCurrentView, t, updateP
           </button>
         </div>
 
-        {/* Hijri Banner */}
+        {/* Date Banner */}
         <div className="card-premium !p-5 bg-gradient-to-br from-white to-emerald-50/30 dark:from-slate-900 dark:to-emerald-950/20 border-emerald-100/50 dark:border-emerald-900/20 flex items-center justify-between shadow-xl shadow-slate-200/50 dark:shadow-none">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-emerald-600 text-white rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-emerald-600/20">
@@ -89,11 +70,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setCurrentView, t, updateP
               <span className="text-[7px] font-black uppercase tracking-widest leading-none">{currentTime.toLocaleString('default', { month: 'short' })}</span>
             </div>
             <div>
-              <h3 className="text-sm font-black text-emerald-900 dark:text-emerald-400 tracking-tight">{hijriData.full}</h3>
-              <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">{currentTime.toLocaleDateString(undefined, { weekday: 'long' })}</p>
+              <h3 className="text-sm font-black text-emerald-900 dark:text-emerald-400 tracking-tight">{currentTime.toLocaleDateString(undefined, { weekday: 'long' })}</h3>
+              <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-0.5">{currentTime.getFullYear()}</p>
             </div>
           </div>
-          <i className="fas fa-moon text-emerald-200 dark:text-emerald-800 text-3xl opacity-30"></i>
+          <i className="fas fa-calendar-day text-emerald-200 dark:text-emerald-800 text-3xl opacity-30"></i>
         </div>
       </div>
 
