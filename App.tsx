@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { AppState, UserProfile, UserData, Language, PrayerStatus, DhikrChallenge, PrayerTimings } from './types';
 import { TRANSLATIONS, PRAYERS } from './constants';
@@ -243,9 +242,11 @@ const App: React.FC = () => {
         <div className="scroll-container px-6 pt-12 content-limit w-full">
           <h1 className="text-4xl font-black text-emerald-950 dark:text-emerald-50 mb-8 tracking-tighter">My Path</h1>
           <div className="grid grid-cols-1 gap-4">
-             {[{ view: 'quran', icon: 'fa-book-open', title: 'quran', color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/30' },
+             {[
+               { view: 'quran', icon: 'fa-book-open', title: 'quran', color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/30' },
                { view: 'fasting', icon: 'fa-moon', title: 'fasting', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/30' },
-               { view: 'women', icon: 'fa-leaf', title: 'womensSpace', color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/30' }].map(item => (
+               ...(compositeData.profile.sex === 'female' ? [{ view: 'women', icon: 'fa-leaf', title: 'womensSpace', color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/30' }] : [])
+             ].map(item => (
                 <div key={item.view} onClick={() => setSubView(item.view)} className="card-premium flex items-center gap-6 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all !p-5">
                    <div className={`w-16 h-16 ${item.bg} ${item.color} rounded-3xl flex items-center justify-center text-3xl`}><i className={`fas ${item.icon}`}></i></div>
                    <div className="flex-1">

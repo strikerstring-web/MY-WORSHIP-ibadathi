@@ -19,6 +19,8 @@ const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStat
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDay = new Date(year, month, 1).getDay();
 
+  const isFemale = state.profile.sex === 'female';
+
   const days = Array.from({ length: daysInMonth }, (_, i) => {
     const d = i + 1;
     return `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -26,7 +28,7 @@ const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStat
 
   const getDayWorshipData = (date: string) => {
     const log = state.prayerLogs[date] || {};
-    const excused = state.healthPeriods.some(p => {
+    const excused = isFemale && state.healthPeriods.some(p => {
       const d = new Date(date).setHours(0, 0, 0, 0);
       const s = new Date(p.start).setHours(0, 0, 0, 0);
       const e = p.end ? new Date(p.end).setHours(23, 59, 59, 999) : new Date().getTime() + 86400000000;
@@ -51,7 +53,7 @@ const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStat
     };
   };
 
-  const selectedData = useMemo(() => getDayWorshipData(selectedDateStr), [selectedDateStr, state]);
+  const selectedData = useMemo(() => getDayWorshipData(selectedDateStr), [selectedDateStr, state, isFemale]);
 
   const handleStatusChange = (prayer: string, status: PrayerStatus) => {
     updatePrayerStatus(selectedDateStr, prayer, status);
@@ -155,10 +157,11 @@ const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStat
               { c: 'bg-rose-500', l: 'missed' },
               { c: 'bg-blue-400', l: 'dhikr' },
               { c: 'bg-purple-400', l: 'quran' },
-              { c: 'bg-amber-400', l: 'fasting' }
+              { c: 'bg-amber-400', l: 'fasting' },
+              ...(isFemale ? [{ c: 'bg-rose-400', l: 'excused' }] : [])
             ].map(item => (
               <div key={item.l} className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${item.c} shadow-sm`}></div>
+                <div className={`w-2 h-2 rounded-full ${item.c} shadow-sm ${item.l === 'excused' ? 'bg-rose-400' : ''}`}></div>
                 <span className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">{t(item.l)}</span>
               </div>
             ))}
@@ -192,6 +195,7 @@ const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStat
                   const log = state.prayerLogs[selectedDateStr] || {};
                   const status = log[p] || PrayerStatus.PENDING;
                   const isEditing = activeEditingPrayer === p;
+                  const isExcusedDay = selectedData.excused;
                   
                   return (
                     <div 
@@ -207,29 +211,32 @@ const PrayerCalendar: React.FC<PrayerCalendarProps> = ({ state, updatePrayerStat
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg transition-all shadow-sm ${
                             status === PrayerStatus.COMPLETED ? 'bg-emerald-500 text-white' : 
                             status === PrayerStatus.MISSED ? 'bg-rose-500 text-white' : 
+                            isExcusedDay ? 'bg-rose-100 dark:bg-rose-900/30 text-rose-400' :
                             'bg-slate-100 dark:bg-slate-800 text-slate-300'
                           }`}>
-                            <i className={`fas ${status === PrayerStatus.COMPLETED ? 'fa-check' : status === PrayerStatus.MISSED ? 'fa-history' : 'fa-clock-rotate-left'}`}></i>
+                            <i className={`fas ${status === PrayerStatus.COMPLETED ? 'fa-check' : status === PrayerStatus.MISSED ? 'fa-history' : isExcusedDay ? 'fa-leaf' : 'fa-clock-rotate-left'}`}></i>
                           </div>
                           <div>
                             <p className="text-sm font-black capitalize text-emerald-950 dark:text-white leading-tight">{t(p)}</p>
                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
-                              {status === PrayerStatus.PENDING ? 'Not Yet Logged' : status}
+                              {isExcusedDay ? t('excused') : (status === PrayerStatus.PENDING ? 'Not Yet Logged' : status)}
                             </p>
                           </div>
                         </div>
                         
-                        <button 
-                          onClick={() => setActiveEditingPrayer(isEditing ? null : p)}
-                          className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${
-                            isEditing ? 'bg-emerald-100 text-emerald-600' : 'text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
-                          }`}
-                        >
-                          <i className={`fas ${isEditing ? 'fa-chevron-up' : 'fa-ellipsis-v'} text-xs`}></i>
-                        </button>
+                        {!isExcusedDay && (
+                          <button 
+                            onClick={() => setActiveEditingPrayer(isEditing ? null : p)}
+                            className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all ${
+                              isEditing ? 'bg-emerald-100 text-emerald-600' : 'text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <i className={`fas ${isEditing ? 'fa-chevron-up' : 'fa-ellipsis-v'} text-xs`}></i>
+                          </button>
+                        )}
                       </div>
 
-                      {isEditing && (
+                      {isEditing && !isExcusedDay && (
                         <div className="mt-5 flex gap-2.5 animate-fade-in">
                           <button 
                             onClick={() => handleStatusChange(p, PrayerStatus.COMPLETED)}
