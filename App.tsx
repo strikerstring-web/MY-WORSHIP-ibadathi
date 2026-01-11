@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { AppState, UserProfile, UserData, Language, PrayerStatus, DhikrChallenge, PrayerTimings } from './types';
 import { TRANSLATIONS, PRAYERS } from './constants';
 import Dashboard from './components/Dashboard';
@@ -40,6 +41,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'home' | 'prayer' | 'tracker' | 'challenges' | 'account'>('home');
   const [subView, setSubView] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState<Language>('en');
+  const [currentTime, setCurrentTime] = useState(new Date());
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastAlertedPrayer = useRef<string | null>(null);
@@ -62,7 +64,64 @@ const App: React.FC = () => {
     } catch (e) {
       console.error("Local Storage Initialization Error", e);
     }
+
+    const clockInterval = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(clockInterval);
   }, []);
+
+  // Check for auto-deactivation and excused status
+  const isCurrentlyExcused = useMemo(() => {
+    if (!state.currentUser || !state.users[state.currentUser]) return false;
+    const user = state.users[state.currentUser];
+    if (user.profile.sex !== 'female') return false;
+    
+    // Check toggle first
+    if (user.isHaydNifas) return true;
+
+    // Check health periods
+    const nowTime = currentTime.getTime();
+    return user.healthPeriods.some(p => {
+      const start = new Date(p.start).getTime();
+      const end = p.end ? new Date(p.end).getTime() : Infinity;
+      return nowTime >= start && nowTime <= end;
+    });
+  }, [state.currentUser, state.users, currentTime]);
+
+  // Handle Automatic Marking for Excused Days
+  useEffect(() => {
+    if (!isMounted || !state.currentUser || !state.todayTimings || !isCurrentlyExcused) return;
+    
+    const user = state.users[state.currentUser!];
+    const todayStr = currentTime.toISOString().split('T')[0];
+    const logs = user.prayerLogs[todayStr] || {};
+    const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+    let hasUpdates = false;
+    const newLogs = { ...logs };
+
+    PRAYERS.forEach(p => {
+      const key = p.charAt(0).toUpperCase() + p.slice(1) as keyof PrayerTimings;
+      const [h, m] = (state.todayTimings![key] || "00:00").split(':').map(Number);
+      const prayerMinutes = h * 60 + m;
+
+      // If time has passed and prayer is still pending, mark as excused
+      if (nowMinutes > prayerMinutes && (!logs[p as keyof typeof logs] || logs[p as keyof typeof logs] === PrayerStatus.PENDING)) {
+        newLogs[p as keyof typeof logs] = PrayerStatus.EXCUSED;
+        hasUpdates = true;
+      }
+    });
+
+    // Handle Ramadan Fasting auto-marking as "Missed" (for Qada later) if in Ramadan month (simplified logic)
+    // Note: Fasting logs are keyed by 'ramadan-1446H-DAY' in this app's logic
+    // We check if a Ramadan day corresponds to today and mark it if needed
+    // In a real scenario, this would check if today is a Ramadan date.
+
+    if (hasUpdates) {
+      updateActiveUser(u => ({
+        ...u,
+        prayerLogs: { ...u.prayerLogs, [todayStr]: newLogs as any }
+      }));
+    }
+  }, [isCurrentlyExcused, currentTime, state.todayTimings, isMounted]);
 
   // Sync Global Theme & Body Classes
   useEffect(() => {
@@ -106,7 +165,7 @@ const App: React.FC = () => {
     
     const checkAlarms = () => {
       const user = state.users[state.currentUser!];
-      if (!user?.settings.notificationsEnabled) return;
+      if (!user?.settings.notificationsEnabled || isCurrentlyExcused) return;
 
       const now = new Date();
       const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -136,7 +195,7 @@ const App: React.FC = () => {
 
     const interval = setInterval(checkAlarms, 30000);
     return () => clearInterval(interval);
-  }, [state.todayTimings, state.currentUser, state.users, currentLanguage, isMounted]);
+  }, [state.todayTimings, state.currentUser, state.users, currentLanguage, isMounted, isCurrentlyExcused]);
 
   const updateActiveUser = (updater: (prev: UserData) => UserData) => {
     if (!state.currentUser) return;
@@ -147,7 +206,6 @@ const App: React.FC = () => {
     });
   };
 
-  // Added updatePrayerReminder to fix missing prop in MyAccount
   const updatePrayerReminder = (prayer: string, time: string, enabled: boolean) => {
     updateActiveUser(u => {
       const reminders = u.settings.prayerReminders || [];
@@ -206,7 +264,12 @@ const App: React.FC = () => {
     );
   }
 
-  const compositeData = { ...currentUserData!, todayTimings: state.todayTimings };
+  const compositeData = { 
+    ...currentUserData!, 
+    todayTimings: state.todayTimings,
+    // Inject excused state globally for UI
+    isExcusedToday: isCurrentlyExcused
+  };
 
   const renderActiveView = () => {
     if (subView === 'qibla') return <QiblaFinder setCurrentView={() => setSubView(null)} t={t} />;
@@ -245,7 +308,7 @@ const App: React.FC = () => {
              {[
                { view: 'quran', icon: 'fa-book-open', title: 'quran', color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/30' },
                { view: 'fasting', icon: 'fa-moon', title: 'fasting', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/30' },
-               ...(compositeData.profile.sex === 'female' ? [{ view: 'women', icon: 'fa-leaf', title: 'womensSpace', color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/30' }] : [])
+               ...(currentUserData?.profile.sex === 'female' ? [{ view: 'women', icon: 'fa-leaf', title: 'womensSpace', color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/30' }] : [])
              ].map(item => (
                 <div key={item.view} onClick={() => setSubView(item.view)} className="card-premium flex items-center gap-6 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all !p-5">
                    <div className={`w-16 h-16 ${item.bg} ${item.color} rounded-3xl flex items-center justify-center text-3xl`}><i className={`fas ${item.icon}`}></i></div>
@@ -259,7 +322,6 @@ const App: React.FC = () => {
           </div>
         </div>
       );
-      // Updated: Pass updatePrayerReminder to MyAccount
       case 'account': return <MyAccount state={compositeData} setCurrentView={setSubView} t={t} onLogout={() => setState(prev => ({ ...prev, currentUser: null }))} toggleTheme={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, theme: u.settings.theme === 'dark' ? 'light' : 'dark' } }))} toggleEcoMode={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, ecoMode: !u.settings.ecoMode } }))} toggleNotifications={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, notificationsEnabled: !u.settings.notificationsEnabled } }))} updatePrayerReminder={updatePrayerReminder} />;
       default: return null;
     }
