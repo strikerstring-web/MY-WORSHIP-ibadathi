@@ -29,6 +29,18 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setCurrentView, t, updateP
     return HADITHS[dayIndex % HADITHS.length];
   }, [currentTime]);
 
+  const hijriDate = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      }).format(currentTime);
+    } catch (e) {
+      return "";
+    }
+  }, [currentTime]);
+
   const nextPrayer = useMemo(() => {
     if (!state.todayTimings) return null;
     const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
@@ -64,7 +76,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setCurrentView, t, updateP
             </button>
           </div>
 
-          {/* Date Banner & Women's Indicator */}
+          {/* Date Banner & Hijri Date */}
           <div className="card-premium !p-4 bg-gradient-to-br from-white to-emerald-50/30 dark:from-slate-900 dark:to-emerald-950/20 border-emerald-100/30 dark:border-emerald-900/10 flex flex-col gap-2 shadow-lg animate-fade-up stagger-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -77,12 +89,16 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setCurrentView, t, updateP
                   <p className="text-[8px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">{currentTime.getFullYear()}</p>
                 </div>
               </div>
-              {state.isExcusedToday && (
-                <div className="py-1.5 px-3 bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/20 rounded-lg flex items-center gap-2 animate-pop">
-                  <div className="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></div>
-                  <span className="text-[7px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest">Excuse Active</span>
-                </div>
-              )}
+              
+              <div className="text-right">
+                <p className="arabic-font text-sm font-bold text-emerald-800 dark:text-emerald-400" dir="rtl">{hijriDate}</p>
+                {state.isExcusedToday && (
+                  <div className="mt-1 py-1 px-2 bg-rose-500/10 dark:bg-rose-950/30 border border-rose-500/20 rounded-lg flex items-center gap-1.5 animate-pop justify-end">
+                    <div className="w-1 h-1 rounded-full bg-rose-500 animate-pulse"></div>
+                    <span className="text-[6px] font-black text-rose-600 dark:text-rose-400 uppercase tracking-widest">Excuse Active</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -126,15 +142,15 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setCurrentView, t, updateP
             </div>
           </div>
 
-          {/* Prayers Tracker */}
+          {/* Prayers Tracker - Refined to match "vibrant circular" request */}
           <div className="mb-8 animate-fade-up stagger-4">
             <div className="flex justify-between items-center mb-5 px-1">
-              <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest">Worship Tracker</h3>
+              <h3 className="text-[10px] font-black text-slate-400 dark:text-slate-400 uppercase tracking-widest">Prayer Tracker</h3>
               <span className={`text-[9px] font-black uppercase tracking-widest ${state.isExcusedToday ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-50'}`}>
                 {state.isExcusedToday ? 'EXCUSED' : `${PRAYERS.filter(p => logs[p as keyof typeof logs] === 'completed').length}/5`}
               </span>
             </div>
-            <div className="flex gap-3 overflow-x-auto no-scrollbar -mx-1 px-1 py-1">
+            <div className="flex gap-4 overflow-x-auto no-scrollbar -mx-1 px-1 py-1">
               {PRAYERS.map(p => {
                 const status = logs[p as keyof typeof logs];
                 const isDone = status === PrayerStatus.COMPLETED;
@@ -146,23 +162,21 @@ const Dashboard: React.FC<DashboardProps> = ({ state, setCurrentView, t, updateP
                     key={p} 
                     disabled={isExcused}
                     onClick={() => !isExcused && updatePrayerStatus(todayStr, p, isDone ? PrayerStatus.PENDING : PrayerStatus.COMPLETED)} 
-                    className={`flex-none w-20 aspect-[4/5] rounded-[1.5rem] border-2 transition-all duration-300 flex flex-col items-center justify-center gap-2 ${
+                    className={`flex-none w-24 aspect-square rounded-full border-2 transition-all duration-300 flex flex-col items-center justify-center gap-1 ${
                       isDone 
-                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600' 
+                        ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-600 shadow-lg shadow-emerald-500/10' 
                         : isExcused
                         ? 'bg-rose-500/10 border-rose-500/20 text-rose-500/60 opacity-80'
                         : 'bg-white dark:bg-slate-900 border-black/5 dark:border-white/10 text-slate-400 hover:border-emerald-200'
                     }`}
                   >
-                    <div className="text-center">
-                      <p className="text-[7px] font-black uppercase tracking-widest mb-0.5 opacity-60 leading-none">{time}</p>
-                      <p className="text-[10px] font-black capitalize leading-none">{t(p)}</p>
-                    </div>
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs transition-all ${
+                    <p className="text-[10px] font-black capitalize leading-none mb-0.5">{t(p)}</p>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xs transition-all ${
                       isDone ? 'bg-emerald-500 text-white shadow-md' : isExcused ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-300'
                     }`}>
                        <i className={`fas ${isDone ? 'fa-check' : isExcused ? 'fa-leaf' : 'fa-clock'}`}></i>
                     </div>
+                    <p className="text-[7px] font-black uppercase tracking-widest opacity-60 leading-none mt-1 tabular-nums">{time}</p>
                   </button>
                 );
               })}

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { UserData, FastingLog, PrayerTimings } from '../types';
 
@@ -16,14 +15,14 @@ const FastingTracker: React.FC<FastingTrackerProps> = ({ state, updateFasting, s
   const getLog = (day: number) => state.fastingLogs[`ramadan-${year}-${day}`] || { status: 'none', type: 'ramadan' };
 
   const toggle = (day: number) => {
-    // If today is an excused day, we can handle logic to mark as missed for Qada
     const current = getLog(day);
     let next: FastingLog['status'] = 'none';
     
+    // Simplified cycle: None -> Completed -> Missed -> None
+    // "Excused" is treated as "Missed" for Qada purposes
     if (current.status === 'none') next = 'completed';
     else if (current.status === 'completed') next = 'missed';
-    else if (current.status === 'missed') next = 'excused';
-    else if (current.status === 'excused') next = 'none';
+    else next = 'none';
     
     updateFasting(`ramadan-${year}-${day}`, { status: next, type: 'ramadan' });
   };
@@ -31,15 +30,15 @@ const FastingTracker: React.FC<FastingTrackerProps> = ({ state, updateFasting, s
   const stats = ramadanDays.reduce((acc, d) => {
     const l = getLog(d);
     if (l.status === 'completed') acc.c++;
-    if (l.status === 'missed') acc.m++;
-    if (l.status === 'excused') acc.e++;
+    // We count both 'missed' and legacy 'excused' entries as missed for stats
+    if (l.status === 'missed' || l.status === 'excused') acc.m++;
     return acc;
-  }, { c: 0, m: 0, e: 0 });
+  }, { c: 0, m: 0 });
 
   return (
     <div className="scroll-container px-4 pt-10 content-limit w-full pb-32">
       <div className="flex items-center gap-3 mb-8">
-        <button onClick={() => setCurrentView(null)} className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center shadow-sm"><i className="fas fa-chevron-left text-xs"></i></button>
+        <button onClick={() => setCurrentView(null)} className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center shadow-sm active:scale-90 transition-transform"><i className="fas fa-chevron-left text-xs"></i></button>
         <h1 className="text-3xl font-black text-emerald-950 dark:text-emerald-50 tracking-tighter">Holy Fasting</h1>
       </div>
 
@@ -50,35 +49,29 @@ const FastingTracker: React.FC<FastingTrackerProps> = ({ state, updateFasting, s
          </div>
          <div className="h-10 w-px bg-white/10"></div>
          <div className="text-center">
-            <p className="text-3xl font-black text-rose-400">{stats.m + stats.e}</p>
-            <p className="text-[8px] font-black uppercase tracking-widest text-white/50">Qada Due</p>
+            <p className="text-3xl font-black text-rose-400">{stats.m}</p>
+            <p className="text-[8px] font-black uppercase tracking-widest text-white/50">Qada Required</p>
          </div>
-         {stats.e > 0 && (
-           <>
-             <div className="h-10 w-px bg-white/10"></div>
-             <div className="text-center">
-                <p className="text-3xl font-black text-pink-300">{stats.e}</p>
-                <p className="text-[8px] font-black uppercase tracking-widest text-white/50">{t('excused')}</p>
-             </div>
-           </>
-         )}
       </div>
 
       <div className="flex items-center justify-between mb-4 px-1">
-        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ramadan {year} Calendar</h3>
+        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ramadan {year} Progress</h3>
         {state.isExcusedToday && (
-          <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 dark:bg-rose-950/40 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/20 flex items-center gap-2">
-            <i className="fas fa-leaf text-[7px]"></i> Excuse Active
-          </span>
+          <div className="flex flex-col items-end">
+            <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 dark:bg-rose-950/40 px-3 py-1 rounded-full border border-rose-100 dark:border-rose-900/20 flex items-center gap-2 mb-1">
+              <i className="fas fa-leaf text-[7px]"></i> Excuse Active
+            </span>
+            <p className="text-[7px] font-bold text-slate-400 uppercase tracking-widest">Mark as Missed for Qada</p>
+          </div>
         )}
       </div>
 
       <div className="grid grid-cols-5 gap-3">
          {ramadanDays.map(d => {
            const log = getLog(d);
+           // Treat legacy 'excused' as missed visually
            const isCompleted = log.status === 'completed';
-           const isMissed = log.status === 'missed';
-           const isExcused = log.status === 'excused';
+           const isMissed = log.status === 'missed' || log.status === 'excused';
            
            return (
              <button 
@@ -86,47 +79,51 @@ const FastingTracker: React.FC<FastingTrackerProps> = ({ state, updateFasting, s
                onClick={() => toggle(d)}
                className={`h-16 rounded-2xl border-2 flex flex-col items-center justify-center transition-all active:scale-95 ${
                  isCompleted 
-                   ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white' 
+                   ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-400 text-white shadow-md' 
                    : isMissed 
-                   ? 'bg-gradient-to-br from-rose-500 to-rose-600 border-rose-400 text-white' 
-                   : isExcused
-                   ? 'bg-gradient-to-br from-pink-500 to-rose-500 border-pink-400 text-white shadow-inner'
+                   ? 'bg-gradient-to-br from-rose-500 to-rose-600 border-rose-400 text-white shadow-sm' 
                    : 'bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-800 border-slate-50 dark:border-slate-800 text-slate-300'
                }`}
              >
                 <span className="text-xs font-black">{d}</span>
                 <i className={`fas ${
                   isCompleted ? 'fa-check' : 
-                  isMissed ? 'fa-xmark' : 
-                  isExcused ? 'fa-leaf' : 'fa-moon'
+                  isMissed ? 'fa-history' : 
+                  'fa-moon'
                 } text-[8px] mt-1`}></i>
              </button>
            );
          })}
       </div>
 
-      <div className="mt-8 p-6 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800">
-        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Fasting Guide</h4>
-        <div className="space-y-4">
+      <div className="mt-8 p-6 bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Ramadan Fasting Rules</h4>
+        <div className="space-y-5">
           <div className="flex items-start gap-4">
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center shrink-0">
-              <i className="fas fa-check text-[10px]"></i>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 flex items-center justify-center shrink-0">
+              <i className="fas fa-check text-xs"></i>
             </div>
-            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed">Fasts completed normally are rewarded in full. Alhamdulillah.</p>
+            <div>
+              <p className="text-[10px] font-black text-emerald-950 dark:text-emerald-50 uppercase tracking-tight mb-0.5">Completed Fast</p>
+              <p className="text-[9px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">Fasts observed from dawn to sunset. Reward multiplied by 10 to 700 times. Alhamdulillah.</p>
+            </div>
           </div>
           <div className="flex items-start gap-4">
-            <div className="w-8 h-8 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-500 flex items-center justify-center shrink-0">
-              <i className="fas fa-xmark text-[10px]"></i>
+            <div className="w-9 h-9 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-500 flex items-center justify-center shrink-0">
+              <i className="fas fa-history text-xs"></i>
             </div>
-            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed">Missed fasts (due to travel/illness) should be marked for Qada.</p>
-          </div>
-          <div className="flex items-start gap-4">
-            <div className="w-8 h-8 rounded-xl bg-pink-50 dark:bg-pink-900/20 text-pink-500 flex items-center justify-center shrink-0">
-              <i className="fas fa-leaf text-[10px]"></i>
+            <div>
+              <p className="text-[10px] font-black text-emerald-950 dark:text-emerald-50 uppercase tracking-tight mb-0.5">Missed / Excused (Qada)</p>
+              <p className="text-[9px] font-medium text-slate-500 dark:text-slate-400 leading-relaxed">Days missed due to travel, illness, or Hayd/Nifas. These must be marked as Missed and made up before the next Ramadan.</p>
             </div>
-            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed">Fasts missed due to Hayd/Nifas are to be made up later, with no sin. Ibadathi labels these clearly for your tracking.</p>
           </div>
         </div>
+      </div>
+      
+      <div className="mt-4 text-center px-6">
+        <p className="text-[8px] text-slate-400 font-bold uppercase tracking-[0.2em] leading-relaxed">
+          "The fast is for Me and I will give the reward for it." (Hadith Qudsi)
+        </p>
       </div>
     </div>
   );

@@ -33,7 +33,6 @@ export interface FastingLog {
 export interface QuranProgress {
   surah: string;
   ayah: string;
-  // Added juz property to track Quran progress by Juz
   juz: string;
   lastUpdated: string;
 }
@@ -91,7 +90,13 @@ export interface HealthPeriod {
   end: string | null; // null if active
 }
 
-// This represents the data for a SINGLE user
+export interface AlarmSettings {
+  ringtoneId: string; // ID of predefined or 'custom'
+  customRingtoneData: string | null; // Base64 or Blob URL
+  vibrationEnabled: boolean;
+  autoAlarmEnabled: boolean;
+}
+
 export interface UserData {
   profile: UserProfile;
   prayerLogs: Record<string, PrayerLog>;
@@ -101,7 +106,7 @@ export interface UserData {
   dhikrCount: number;
   activeChallenges: DhikrChallenge[];
   personalDhikrs: PersonalDhikr[];
-  activeDhikrId: string | null; // Tracked active challenge for the counter
+  activeDhikrId: string | null;
   dhikrHistory: DhikrHistoryEntry[];
   isHaydNifas: boolean;
   haydStartDate: string | null;
@@ -110,14 +115,17 @@ export interface UserData {
     notificationsEnabled: boolean;
     locationEnabled: boolean;
     theme: 'light' | 'dark';
-    ecoMode: boolean; // Optimize for low-end devices
+    ecoMode: boolean;
     qadaReminders: QadaReminder[];
     prayerReminders: PrayerReminder[];
+    calculationMethod: number;
+    alarm: AlarmSettings;
+    prayerOffsets: Record<string, number>; // Manual adjustment in minutes
   };
 }
 
 export interface AppState {
-  currentUser: string | null; // username
-  users: Record<string, UserData>; // Mock database
+  currentUser: string | null;
+  users: Record<string, UserData>;
   todayTimings: PrayerTimings | null;
 }

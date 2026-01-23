@@ -2,6 +2,28 @@ import { Language } from './types';
 
 export const PRAYERS = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
 
+export const BUILTIN_ALARM_SOUNDS = [
+  { id: 'azan_makkah', name: 'Azan Makkah (Beautiful)', url: 'https://www.islamcan.com/audio/adhan/azan1.mp3' },
+  { id: 'azan_madinah', name: 'Azan Madinah (Calm)', url: 'https://www.islamcan.com/audio/adhan/azan2.mp3' },
+  { id: 'azan_mishary', name: 'Azan Mishary Rashid', url: 'https://www.islamcan.com/audio/adhan/azan21.mp3' },
+  { id: 'azan_kerala', name: 'Kerala Style Azan', url: 'https://www.islamcan.com/audio/adhan/azan6.mp3' },
+  { id: 'beep_classic', name: 'Classic Alarm Beep', url: 'https://assets.mixkit.co/active_storage/sfx/1003/1003-preview.mp3' },
+  { id: 'beep_soft', name: 'Soft Alert Beep', url: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3' },
+  { id: 'digital_alarm', name: 'Digital Clock Sound', url: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' },
+  { id: 'vibration_only', name: 'Vibration Only', url: '' }
+];
+
+export const PRAYER_METHODS = [
+  { id: 1, name: 'India / Kerala / Tamil Nadu (Karachi Method)' },
+  { id: 3, name: 'Muslim World League' },
+  { id: 2, name: 'Islamic Society of North America (ISNA)' },
+  { id: 4, name: 'Umm Al-Qura University, Makkah' },
+  { id: 5, name: 'Egyptian General Authority of Survey' },
+  { id: 8, name: 'Gulf Region' },
+  { id: 13, name: 'Turkey (Diyanet)' },
+  { id: 15, name: 'Moonsighting Committee' }
+];
+
 export const SURAHS = [
   "Al-Fatihah", "Al-Baqarah", "Aal-E-Imran", "An-Nisa", "Al-Ma'idah", "Al-An'am", "Al-A'raf", "Al-Anfal", "At-Tawbah", "Yunus",
   "Hud", "Yusuf", "Ar-Ra'd", "Ibrahim", "Al-Hijr", "An-Nahl", "Al-Isra", "Al-Kahf", "Maryam", "Ta-Ha",
@@ -80,7 +102,7 @@ export const HADITHS: MultiLangHadith[] = [
     en: "Whoever believes in Allah and the Last Day, let him speak goodness or remain silent.",
     ml: "അല്ലാഹുവിലും അന്ത്യദിനത്തിലും വിശ്വസിക്കുന്നവൻ നല്ലത് സംസാരിക്കട്ടെ, അല്ലെങ്കിൽ മിണ്ടാതിരിക്കട്ടെ.",
     ta: "அல்லாஹ்வையும் மறுமை நாளையும் நம்புபவர் நல்லதைப் பேசட்டும் அல்லது வாய்மூடி இருக்கட்டும்.",
-    ar: "من كان يؤمن بالله واليوم الآخر فليقل خيرا أو ليصمت.",
+    ar: "من كان يومن بالله واليوم الآخر فليقل خيرا أو ليصمت.",
     reference: "Sahih al-Bukhari 6018"
   }
 ];
@@ -195,7 +217,15 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     daily: 'Daily',
     session: 'Session',
     resetSession: 'Reset Session',
-    deleteDhikr: 'Delete Dhikr'
+    deleteDhikr: 'Delete Dhikr',
+    calcMethod: 'Calculation Method',
+    locationRefresh: 'Update Location & Timings',
+    alarmSettings: 'Alarm Settings',
+    ringtone: 'Ringtone',
+    vibration: 'Vibration',
+    autoAlarm: 'Auto Azan Alarm',
+    customRingtone: 'Upload Ringtone',
+    testAlarm: 'Test Sound'
   },
   ar: {
     welcome: 'مرحباً بك',
@@ -306,7 +336,15 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     daily: 'اليومي',
     session: 'الجلسة',
     resetSession: 'إعادة الجلسة',
-    deleteDhikr: 'حذف الذكر'
+    deleteDhikr: 'حذف الذكر',
+    calcMethod: 'طريقة الحساب',
+    locationRefresh: 'تحديث الموقع والتوقيت',
+    alarmSettings: 'إعدادات المنبه',
+    ringtone: 'نغمة الرنين',
+    vibration: 'الاهتزاز',
+    autoAlarm: 'منبه الأذان التلقائي',
+    customRingtone: 'رفع نغمة',
+    testAlarm: 'تجربة الصوت'
   },
   ml: {
     welcome: 'സ്വാഗതം',
@@ -417,7 +455,15 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     daily: 'ഇന്ന്',
     session: 'ഇപ്പോൾ',
     resetSession: 'റീസെറ്റ്',
-    deleteDhikr: 'ഡിലീറ്റ്'
+    deleteDhikr: 'ഡിലീറ്റ്',
+    calcMethod: 'കണക്കുകൂട്ടൽ രീതി',
+    locationRefresh: 'സ്ഥലവും സമയവും പുതുക്കുക',
+    alarmSettings: 'അലാറം ക്രമീകരണങ്ങൾ',
+    ringtone: 'റിംഗ്‌ടോൺ',
+    vibration: 'വൈബ്രേഷൻ',
+    autoAlarm: 'ഓട്ടോ അസാൻ അലാറം',
+    customRingtone: 'അപ്‌ലോഡ് റിംഗ്‌ടോൺ',
+    testAlarm: 'ശബ്ദം പരിശോധിക്കുക'
   },
   ta: {
     welcome: 'வரவேற்பு',
@@ -528,6 +574,14 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     daily: 'இன்று',
     session: 'அமர்வு',
     resetSession: 'மீட்டமை',
-    deleteDhikr: 'நீக்கு'
+    deleteDhikr: 'நீக்கு',
+    calcMethod: 'கணக்கீட்டு முறை',
+    locationRefresh: 'இடம் மற்றும் நேரத்தைப் புதுப்பிக்கவும்',
+    alarmSettings: 'அலார அமைப்புகள்',
+    ringtone: 'ரிங்டோன்',
+    vibration: 'அதிர்வு',
+    autoAlarm: 'தானியங்கி அஸான் அலாரம்',
+    customRingtone: 'ரிங்டோனைப் பதிவேற்றவும்',
+    testAlarm: 'ஒலியைச் சோதிக்கவும்'
   }
 };
