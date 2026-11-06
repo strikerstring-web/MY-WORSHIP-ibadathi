@@ -13,7 +13,9 @@ const QuranTracker: React.FC<QuranTrackerProps> = ({ state, onUpdate, setCurrent
   const [surahInput, setSurahInput] = useState(state.quranProgress.surah || '');
   const [ayahInput, setAyahInput] = useState(state.quranProgress.ayah || '');
   const [juzInput, setJuzInput] = useState(state.quranProgress.juz || '');
+  const [pageInput, setPageInput] = useState(state.quranProgress.page || '');
   const [showDropdown, setShowDropdown] = useState(false);
+  const [savedAlert, setSavedAlert] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const filteredSurahs = useMemo(() => {
@@ -31,13 +33,22 @@ const QuranTracker: React.FC<QuranTrackerProps> = ({ state, onUpdate, setCurrent
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handlePageStep = (delta: number) => {
+    const current = parseInt(pageInput, 10) || 0;
+    const next = Math.max(1, Math.min(604, current + delta));
+    setPageInput(next.toString());
+  };
+
   const handleSave = () => {
     onUpdate({
       surah: surahInput,
       ayah: ayahInput,
       juz: juzInput,
+      page: pageInput,
       lastUpdated: new Date().toISOString()
     });
+    setSavedAlert(true);
+    setTimeout(() => setSavedAlert(false), 2500);
     if ('vibrate' in navigator) navigator.vibrate(40);
   };
 
@@ -66,12 +77,66 @@ const QuranTracker: React.FC<QuranTrackerProps> = ({ state, onUpdate, setCurrent
           </div>
           <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">{t('lastRead')}</span>
           <h2 className="text-lg font-black text-emerald-950 dark:text-emerald-50 leading-tight">
-            {state.quranProgress.surah ? `${state.quranProgress.surah}, ${t('ayah')} ${state.quranProgress.ayah}` : 'Not started'}
+            {state.quranProgress.surah ? `${state.quranProgress.surah}${state.quranProgress.ayah ? `, ${t('ayah')} ${state.quranProgress.ayah}` : ''}` : 'Not started'}
           </h2>
-          {state.quranProgress.juz && <p className="text-[8px] font-black text-amber-600 mt-0.5 uppercase tracking-widest">{t('juz')} {state.quranProgress.juz}</p>}
+          
+          <div className="flex items-center justify-center gap-2 mt-2 flex-wrap">
+            {state.quranProgress.page && (
+              <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 border border-amber-500/20">
+                <i className="fas fa-file-lines text-[9px]"></i> {t('page')} {state.quranProgress.page}
+              </span>
+            )}
+            {state.quranProgress.juz && (
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 border border-emerald-500/20">
+                <i className="fas fa-bookmark text-[9px]"></i> {t('juz')} {state.quranProgress.juz}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="space-y-4">
+          {/* Add Page No section */}
+          <div className="p-3.5 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black text-amber-800 dark:text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                <i className="fas fa-file-lines text-amber-600"></i>
+                <span>Add Page No (Mushaf)</span>
+              </label>
+              <span className="text-[9px] font-bold text-slate-400">Pages 1 – 604</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handlePageStep(-1)}
+                className="w-11 h-11 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-center justify-center text-amber-700 dark:text-amber-300 active:scale-95 shadow-sm text-sm font-black"
+                title="Previous Page"
+              >
+                <i className="fas fa-minus text-xs"></i>
+              </button>
+
+              <input 
+                type="number" 
+                min="1"
+                max="604"
+                placeholder="Page # (e.g. 142)"
+                className={`${inputClasses} text-center text-base`}
+                value={pageInput}
+                onChange={(e) => setPageInput(e.target.value)}
+              />
+
+              <button
+                type="button"
+                onClick={() => handlePageStep(1)}
+                className="w-11 h-11 bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-900/50 rounded-xl flex items-center justify-center text-amber-700 dark:text-amber-300 active:scale-95 shadow-sm text-sm font-black"
+                title="Next Page"
+              >
+                <i className="fas fa-plus text-xs"></i>
+              </button>
+            </div>
+          </div>
+
+          {/* Surah dropdown selection */}
           <div className="space-y-1 relative" ref={dropdownRef}>
             <label className={labelClasses}>{t('surah')}</label>
             <input 
@@ -91,10 +156,11 @@ const QuranTracker: React.FC<QuranTrackerProps> = ({ state, onUpdate, setCurrent
             )}
           </div>
 
+          {/* Juz & Ayah inputs */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className={labelClasses}>{t('juz')}</label>
-              <input type="number" placeholder="1-30" className={inputClasses} value={juzInput} onChange={(e) => setJuzInput(e.target.value)} />
+              <input type="number" min="1" max="30" placeholder="1-30" className={inputClasses} value={juzInput} onChange={(e) => setJuzInput(e.target.value)} />
             </div>
             <div className="space-y-1">
               <label className={labelClasses}>{t('ayah')}</label>
@@ -102,7 +168,14 @@ const QuranTracker: React.FC<QuranTrackerProps> = ({ state, onUpdate, setCurrent
             </div>
           </div>
 
-          <button onClick={handleSave} className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-900/10 active:scale-95 transition-transform">
+          {savedAlert && (
+            <div className="p-3 bg-emerald-500/15 border border-emerald-500/30 rounded-xl flex items-center justify-center gap-2 text-emerald-700 dark:text-emerald-300 text-xs font-bold animate-pop">
+              <i className="fas fa-circle-check"></i>
+              <span>Reading progress saved!</span>
+            </div>
+          )}
+
+          <button onClick={handleSave} className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-900/10 active:scale-95 transition-all">
             {t('save')}
           </button>
         </div>

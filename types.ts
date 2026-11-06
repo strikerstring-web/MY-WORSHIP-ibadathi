@@ -34,6 +34,7 @@ export interface QuranProgress {
   surah: string;
   ayah: string;
   juz: string;
+  page?: string;
   lastUpdated: string;
 }
 
@@ -97,6 +98,15 @@ export interface AlarmSettings {
   autoAlarmEnabled: boolean;
 }
 
+export interface LocationInfo {
+  city: string;
+  country?: string;
+  latitude?: number;
+  longitude?: number;
+  timezone?: string;
+  source: 'gps' | 'city' | 'default';
+}
+
 export interface UserData {
   profile: UserProfile;
   prayerLogs: Record<string, PrayerLog>;
@@ -114,6 +124,7 @@ export interface UserData {
   settings: {
     notificationsEnabled: boolean;
     locationEnabled: boolean;
+    savedLocation?: LocationInfo;
     theme: 'light' | 'dark';
     ecoMode: boolean;
     qadaReminders: QadaReminder[];
@@ -128,4 +139,5 @@ export interface AppState {
   currentUser: string | null;
   users: Record<string, UserData>;
   todayTimings: PrayerTimings | null;
+  locationInfo?: LocationInfo;
 }

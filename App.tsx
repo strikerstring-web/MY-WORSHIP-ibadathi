@@ -12,6 +12,9 @@ import Welcome from './components/Welcome';
 import QiblaFinder from './components/QiblaFinder';
 import AboutHelp from './components/AboutHelp';
 import MyAccount from './components/MyAccount';
+import TrackerPage from './components/TrackerPage';
+import LocationModal from './components/LocationModal';
+import { LocationInfo } from './types';
 
 const USERS_DB_KEY = 'ibadathi_v6_users_database';
 const SESSION_KEY = 'ibadathi_v6_active_session';
@@ -38,87 +41,231 @@ const DEFAULT_TIMINGS: PrayerTimings = {
   Fajr: "05:12", Sunrise: "06:34", Dhuhr: "12:28", Asr: "15:42", Maghrib: "18:22", Isha: "19:38"
 };
 
+const LOCATION_CACHE_KEY = 'ibadathi_v6_active_location';
+
 const App: React.FC = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [state, setState] = useState<AppState>({
     currentUser: null,
     users: {},
-    todayTimings: DEFAULT_TIMINGS
+    todayTimings: DEFAULT_TIMINGS,
+    locationInfo: {
+      city: 'Detecting Location...',
+      source: 'default'
+    }
   });
 
   const [activeTab, setActiveTab] = useState<'home' | 'prayer' | 'tracker' | 'challenges' | 'account'>('home');
   const [subView, setSubView] = useState<string | null>(null);
   const [currentLanguage, setCurrentLanguage] = useState<Language>('en');
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastAlertedPrayer = useRef<string | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  const fetchTimings = useCallback(async (lat: number, lng: number, method: number = 1) => {
+  // Fetch timings by exact coordinates
+  const fetchTimingsByCoords = useCallback(async (lat: number, lng: number, method: number = 1, customCityName?: string) => {
     try {
       const now = new Date();
       const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
-      const response = await fetch(`https://api.aladhan.com/v1/timings/${dateStr}?latitude=${lat}&longitude=${lng}&method=${method}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+      const response = await fetch(`https://api.aladhan.com/v1/timings/${dateStr}?latitude=${lat}&longitude=${lng}&method=${method}`, {
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn(`AlAdhan API returned status ${response.status}`);
+        return;
+      }
       const data = await response.json();
       if (data && data.data && data.data.timings) {
         const t = data.data.timings;
         const newTimings: PrayerTimings = {
           Fajr: t.Fajr, Sunrise: t.Sunrise, Dhuhr: t.Dhuhr, Asr: t.Asr, Maghrib: t.Maghrib, Isha: t.Isha
         };
-        setState(prev => ({ ...prev, todayTimings: newTimings }));
+        const tzName = data.data.meta?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const inferredCity = customCityName || (tzName ? (tzName.split('/')[1] || tzName).replace(/_/g, ' ') : `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`);
+        
+        const locInfo: LocationInfo = {
+          city: inferredCity,
+          latitude: lat,
+          longitude: lng,
+          timezone: tzName,
+          source: 'gps'
+        };
+
+        setState(prev => ({ ...prev, todayTimings: newTimings, locationInfo: locInfo }));
+        try {
+          localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(locInfo));
+        } catch (e) {}
       }
     } catch (error) {
-      console.error("Failed to fetch timings:", error);
+      console.warn("Could not fetch timings by coordinates (keeping current/default timings):", error);
     }
   }, []);
 
-  const refreshLocationAndTimings = useCallback(() => {
-    const user = state.currentUser ? state.users[state.currentUser] : null;
-    const method = user?.settings.calculationMethod || 1;
+  // Fetch timings by city or address string
+  const fetchTimingsByAddress = useCallback(async (address: string, method: number = 1) => {
+    try {
+      const now = new Date();
+      const dateStr = `${String(now.getDate()).padStart(2, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${now.getFullYear()}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+      const response = await fetch(`https://api.aladhan.com/v1/timingsByAddress/${dateStr}?address=${encodeURIComponent(address)}&method=${method}`, {
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        console.warn(`AlAdhan API returned status ${response.status}`);
+        return;
+      }
+      const data = await response.json();
+      if (data && data.data && data.data.timings) {
+        const t = data.data.timings;
+        const newTimings: PrayerTimings = {
+          Fajr: t.Fajr, Sunrise: t.Sunrise, Dhuhr: t.Dhuhr, Asr: t.Asr, Maghrib: t.Maghrib, Isha: t.Isha
+        };
+        const locInfo: LocationInfo = {
+          city: address,
+          latitude: data.data.meta?.latitude,
+          longitude: data.data.meta?.longitude,
+          timezone: data.data.meta?.timezone,
+          source: 'city'
+        };
+
+        setState(prev => ({ ...prev, todayTimings: newTimings, locationInfo: locInfo }));
+        try {
+          localStorage.setItem(LOCATION_CACHE_KEY, JSON.stringify(locInfo));
+        } catch (e) {}
+      }
+    } catch (error) {
+      console.warn("Could not fetch timings by address (keeping current/default timings):", error);
+    }
+  }, []);
+
+  // Cascade auto-detect location and timings
+  const detectAndRefreshLocation = useCallback((methodOrUser?: number | UserData | null, maybeUser?: UserData | null) => {
+    let forcedMethod: number | undefined;
+    let specificUser: UserData | null | undefined;
+
+    if (typeof methodOrUser === 'number') {
+      forcedMethod = methodOrUser;
+      specificUser = maybeUser;
+    } else if (methodOrUser !== undefined) {
+      specificUser = methodOrUser;
+      if (typeof maybeUser === 'number') {
+        forcedMethod = maybeUser;
+      }
+    }
+
+    const currentUsers = stateRef.current.users;
+    const currentUserName = stateRef.current.currentUser;
+    const user = specificUser ?? (currentUserName ? currentUsers[currentUserName] : null);
+    const method = forcedMethod || user?.settings?.calculationMethod || 1;
+
+    let cachedLoc: LocationInfo | null = null;
+    try {
+      const stored = localStorage.getItem(LOCATION_CACHE_KEY);
+      if (stored) cachedLoc = JSON.parse(stored);
+      if (!cachedLoc && user?.settings?.savedLocation) cachedLoc = user.settings.savedLocation;
+    } catch (e) {}
+
+    // First attempt GPS with a reasonable timeout and fallback
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => fetchTimings(pos.coords.latitude, pos.coords.longitude, method),
-        (err) => console.warn("Location permission denied", err),
-        { enableHighAccuracy: true }
+        (pos) => {
+          fetchTimingsByCoords(pos.coords.latitude, pos.coords.longitude, method);
+        },
+        (err) => {
+          console.warn("GPS unavailable or denied, falling back:", err?.message || err);
+          if (cachedLoc?.latitude && cachedLoc?.longitude) {
+            fetchTimingsByCoords(cachedLoc.latitude, cachedLoc.longitude, method, cachedLoc.city);
+          } else if (cachedLoc?.city) {
+            fetchTimingsByAddress(cachedLoc.city, method);
+          } else if (user?.profile?.place) {
+            fetchTimingsByAddress(user.profile.place, method);
+          } else {
+            // Intelligent timezone-based city fallback
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Dubai';
+            const city = (tz.split('/')[1] || tz).replace(/_/g, ' ');
+            fetchTimingsByAddress(city, method);
+          }
+        },
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 300000 }
       );
+    } else {
+      if (cachedLoc?.city) {
+        fetchTimingsByAddress(cachedLoc.city, method);
+      } else if (user?.profile?.place) {
+        fetchTimingsByAddress(user.profile.place, method);
+      } else {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Dubai';
+        const city = (tz.split('/')[1] || tz).replace(/_/g, ' ');
+        fetchTimingsByAddress(city, method);
+      }
     }
-  }, [state.currentUser, state.users, fetchTimings]);
+  }, [fetchTimingsByCoords, fetchTimingsByAddress]);
 
+  // Alias for backward compatibility
+  const detectLocationAndTimings = detectAndRefreshLocation;
+
+  // Initial Startup Effect (Run strictly once on mount)
   useEffect(() => {
     setIsMounted(true);
+    let activeUser: UserData | null = null;
     try {
       const savedUsers = localStorage.getItem(USERS_DB_KEY);
       const activeSession = localStorage.getItem(SESSION_KEY);
       let parsedUsers: Record<string, UserData> = {};
       if (savedUsers) parsedUsers = JSON.parse(savedUsers);
       const currentUser = (activeSession && parsedUsers[activeSession.toLowerCase()]) ? activeSession.toLowerCase() : null;
-      setState(prev => ({ ...prev, users: parsedUsers, currentUser: currentUser }));
       
-      if (currentUser) {
-        const user = parsedUsers[currentUser];
-        if (user) setCurrentLanguage(user.profile.preferredLanguage);
-        
-        if ("geolocation" in navigator) {
-          const userMethod = user?.settings.calculationMethod || 1;
-          navigator.geolocation.getCurrentPosition(
-            (pos) => fetchTimings(pos.coords.latitude, pos.coords.longitude, userMethod),
-            (err) => console.warn("Location not permitted on startup", err),
-            { enableHighAccuracy: true }
-          );
-        }
+      let initialLocation: LocationInfo = {
+        city: 'Detecting Location...',
+        source: 'default'
+      };
+      try {
+        const storedLoc = localStorage.getItem(LOCATION_CACHE_KEY);
+        if (storedLoc) initialLocation = JSON.parse(storedLoc);
+      } catch (e) {}
+
+      setState(prev => ({ 
+        ...prev, 
+        users: parsedUsers, 
+        currentUser: currentUser,
+        locationInfo: initialLocation 
+      }));
+      
+      activeUser = currentUser ? parsedUsers[currentUser] : null;
+      if (activeUser && activeUser.profile?.preferredLanguage) {
+        setCurrentLanguage(activeUser.profile.preferredLanguage);
       }
     } catch (e) {
       console.error("Local Storage Initialization Error", e);
     }
+
+    detectAndRefreshLocation(undefined, activeUser);
+
     const clockInterval = setInterval(() => setCurrentTime(new Date()), 10000);
     return () => clearInterval(clockInterval);
-  }, [fetchTimings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Sync language with user profile changes
   useEffect(() => {
     if (state.currentUser && state.users[state.currentUser]) {
-      const userLang = state.users[state.currentUser].profile.preferredLanguage;
-      if (userLang !== currentLanguage) {
+      const userLang = state.users[state.currentUser].profile?.preferredLanguage;
+      if (userLang && userLang !== currentLanguage) {
         setCurrentLanguage(userLang);
       }
     }
@@ -233,7 +380,7 @@ const App: React.FC = () => {
       const newUserData: UserData = {
         profile: { ...profile, username: userKey },
         prayerLogs: {}, sunnahLogs: {}, fastingLogs: {},
-        quranProgress: { surah: '', ayah: '', juz: '', lastUpdated: '' },
+        quranProgress: { surah: '', ayah: '', juz: '', page: '', lastUpdated: '' },
         dhikrCount: 0, activeChallenges: INITIAL_DHIKRS, personalDhikrs: [],
         activeDhikrId: null, dhikrHistory: [], isHaydNifas: false, haydStartDate: null, healthPeriods: [],
         settings: { 
@@ -244,16 +391,20 @@ const App: React.FC = () => {
       };
       setState(prev => ({ ...prev, currentUser: userKey, users: { ...prev.users, [userKey]: newUserData } }));
       setCurrentLanguage(newUserData.profile.preferredLanguage);
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition((pos) => fetchTimings(pos.coords.latitude, pos.coords.longitude, 1), null, { enableHighAccuracy: true });
+      if (profile.place) {
+        fetchTimingsByAddress(profile.place, 1);
+      } else {
+        detectAndRefreshLocation(1);
       }
     } else {
       setState(prev => ({ ...prev, currentUser: userKey }));
       const user = state.users[userKey];
       if (user) setCurrentLanguage(user.profile.preferredLanguage);
-      if ("geolocation" in navigator) {
-        const userMethod = user?.settings.calculationMethod || 1;
-        navigator.geolocation.getCurrentPosition((pos) => fetchTimings(pos.coords.latitude, pos.coords.longitude, userMethod), null, { enableHighAccuracy: true });
+      const userMethod = user?.settings.calculationMethod || 1;
+      if (user?.profile.place) {
+        fetchTimingsByAddress(user.profile.place, userMethod);
+      } else {
+        detectAndRefreshLocation(userMethod);
       }
     }
     setSubView(null);
@@ -277,7 +428,12 @@ const App: React.FC = () => {
     );
   }
 
-  const compositeData = { ...currentUserData!, todayTimings: adjustedTimings, isExcusedToday: isCurrentlyExcused };
+  const compositeData = { 
+    ...currentUserData!, 
+    todayTimings: adjustedTimings, 
+    isExcusedToday: isCurrentlyExcused,
+    locationInfo: state.locationInfo
+  };
 
   const renderActiveView = () => {
     if (subView === 'qibla') return <QiblaFinder setCurrentView={() => setSubView(null)} t={t} />;
@@ -287,7 +443,16 @@ const App: React.FC = () => {
     if (subView === 'women') return <WomensSpace state={compositeData} toggleHayd={(a) => updateActiveUser(u => ({ ...u, isHaydNifas: a }))} addHealthPeriod={(s, e) => updateActiveUser(u => ({ ...u, healthPeriods: [...u.healthPeriods, { id: Date.now().toString(), start: s, end: e }] }))} removeHealthPeriod={(id) => updateActiveUser(u => ({ ...u, healthPeriods: u.healthPeriods.filter(p => p.id !== id) }))} setCurrentView={() => setSubView(null)} t={t} />;
 
     switch (activeTab) {
-      case 'home': return <Dashboard state={compositeData} setCurrentView={setSubView} t={t} updatePrayerStatus={(d, p, s) => updateActiveUser(u => ({ ...u, prayerLogs: { ...u.prayerLogs, [d]: { ...(u.prayerLogs[d] || {}), [p]: s } as any } }))} onLogout={() => setState(prev => ({ ...prev, currentUser: null }))} />;
+      case 'home': return (
+        <Dashboard 
+          state={compositeData} 
+          setCurrentView={setSubView} 
+          onOpenLocationModal={() => setIsLocationModalOpen(true)}
+          t={t} 
+          updatePrayerStatus={(d, p, s) => updateActiveUser(u => ({ ...u, prayerLogs: { ...u.prayerLogs, [d]: { ...(u.prayerLogs[d] || {}), [p]: s } as any } }))} 
+          onLogout={() => setState(prev => ({ ...prev, currentUser: null }))} 
+        />
+      );
       case 'prayer': return <PrayerCalendar state={compositeData} updatePrayerStatus={(d, p, s) => updateActiveUser(u => ({ ...u, prayerLogs: { ...u.prayerLogs, [d]: { ...(u.prayerLogs[d] || {}), [p]: s } as any } }))} setCurrentView={setSubView} t={t} />;
       case 'challenges': return (
         <DhikrCounter 
@@ -301,23 +466,12 @@ const App: React.FC = () => {
         />
       );
       case 'tracker': return (
-        <div className="scroll-container px-6 pt-12 content-limit w-full">
-          <h1 className="text-4xl font-black text-emerald-950 dark:text-emerald-50 mb-8 tracking-tighter">My Path</h1>
-          <div className="grid grid-cols-1 gap-4">
-             {[
-               { view: 'quran', icon: 'fa-book-open', title: 'quran', color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-900/30' },
-               { view: 'fasting', icon: 'fa-moon', title: 'fasting', color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/30' },
-               { view: 'qibla', icon: 'fa-compass', title: 'qibla', color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-900/30' },
-               ...(currentUserData?.profile.sex === 'female' ? [{ view: 'women', icon: 'fa-leaf', title: 'womensSpace', color: 'text-rose-600', bg: 'bg-rose-50 dark:bg-rose-900/30' }] : [])
-             ].map(item => (
-                <div key={item.view} onClick={() => setSubView(item.view)} className="card-premium flex items-center gap-6 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all !p-5">
-                   <div className={`w-16 h-16 ${item.bg} ${item.color} rounded-3xl flex items-center justify-center text-3xl`}><i className={`fas ${item.icon}`}></i></div>
-                   <div className="flex-1"><h3 className="font-black text-emerald-950 dark:text-emerald-50 text-xl tracking-tight">{t(item.title)}</h3><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Worship Insights</p></div>
-                   <i className="fas fa-chevron-right text-slate-200"></i>
-                </div>
-             ))}
-          </div>
-        </div>
+        <TrackerPage 
+          state={compositeData} 
+          setCurrentView={setSubView} 
+          updateTotalDhikrCount={(delta) => updateActiveUser(u => ({ ...u, dhikrCount: u.dhikrCount + delta }))} 
+          t={t} 
+        />
       );
       case 'account': return (
         <MyAccount 
@@ -326,8 +480,11 @@ const App: React.FC = () => {
           toggleEcoMode={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, ecoMode: !u.settings.ecoMode } }))} 
           toggleNotifications={() => updateActiveUser(u => ({ ...u, settings: { ...u.settings, notificationsEnabled: !u.settings.notificationsEnabled } }))} 
           updatePrayerReminder={(p, time, enabled) => updateActiveUser(u => { const r = u.settings.prayerReminders || []; const i = r.findIndex(x => x.prayer === p); const nr = [...r]; if (i > -1) nr[i] = { prayer: p, time, enabled }; else nr.push({ prayer: p, time, enabled }); return { ...u, settings: { ...u.settings, prayerReminders: nr } }; })} 
-          setCalculationMethod={(m) => { updateActiveUser(u => ({ ...u, settings: { ...u.settings, calculationMethod: m } })); refreshLocationAndTimings(); }} 
-          refreshTimings={refreshLocationAndTimings}
+          setCalculationMethod={(m) => { 
+            updateActiveUser(u => ({ ...u, settings: { ...u.settings, calculationMethod: m } })); 
+            detectAndRefreshLocation(m); 
+          }} 
+          refreshTimings={() => setIsLocationModalOpen(true)}
           updateAlarmSettings={(cfg) => updateActiveUser(u => ({ ...u, settings: { ...u.settings, alarm: { ...u.settings.alarm, ...cfg } } }))}
           updateProfile={(p) => updateActiveUser(u => ({ ...u, profile: { ...u.profile, ...p } }))}
         />
@@ -349,6 +506,42 @@ const App: React.FC = () => {
           ))}
         </nav>
       )}
+
+      {/* Global Azan Location Modal */}
+      <LocationModal
+        isOpen={isLocationModalOpen}
+        onClose={() => setIsLocationModalOpen(false)}
+        currentLocation={state.locationInfo}
+        currentMethod={currentUserData?.settings.calculationMethod || 1}
+        onSelectCoords={async (lat, lng, cityName) => {
+          const method = currentUserData?.settings.calculationMethod || 1;
+          await fetchTimingsByCoords(lat, lng, method, cityName);
+          updateActiveUser(u => ({
+            ...u,
+            settings: {
+              ...u.settings,
+              savedLocation: { city: cityName || 'GPS Location', latitude: lat, longitude: lng, source: 'gps' }
+            }
+          }));
+        }}
+        onSelectCity={async (cityName, method) => {
+          const m = method || currentUserData?.settings.calculationMethod || 1;
+          await fetchTimingsByAddress(cityName, m);
+          updateActiveUser(u => ({
+            ...u,
+            profile: { ...u.profile, place: cityName },
+            settings: {
+              ...u.settings,
+              ...(method ? { calculationMethod: method } : {}),
+              savedLocation: { city: cityName, source: 'city' }
+            }
+          }));
+        }}
+        onSelectMethod={(m) => {
+          updateActiveUser(u => ({ ...u, settings: { ...u.settings, calculationMethod: m } }));
+          detectAndRefreshLocation(m);
+        }}
+      />
     </div>
   );
 };

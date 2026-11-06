@@ -24,6 +24,21 @@ export const PRAYER_METHODS = [
   { id: 15, name: 'Moonsighting Committee' }
 ];
 
+export const POPULAR_CITIES = [
+  { name: 'Makkah', country: 'Saudi Arabia', method: 4, icon: 'fa-kaaba' },
+  { name: 'Madinah', country: 'Saudi Arabia', method: 4, icon: 'fa-mosque' },
+  { name: 'Dubai', country: 'UAE', method: 4, icon: 'fa-building' },
+  { name: 'Cairo', country: 'Egypt', method: 5, icon: 'fa-landmark' },
+  { name: 'Istanbul', country: 'Turkey', method: 13, icon: 'fa-mosque' },
+  { name: 'London', country: 'UK', method: 3, icon: 'fa-city' },
+  { name: 'New York', country: 'USA', method: 2, icon: 'fa-tree-city' },
+  { name: 'Kozhikode', country: 'India', method: 1, icon: 'fa-location-dot' },
+  { name: 'Karachi', country: 'Pakistan', method: 1, icon: 'fa-city' },
+  { name: 'Jakarta', country: 'Indonesia', method: 3, icon: 'fa-earth-asia' },
+  { name: 'Kuala Lumpur', country: 'Malaysia', method: 3, icon: 'fa-building-columns' },
+  { name: 'Toronto', country: 'Canada', method: 2, icon: 'fa-city' }
+];
+
 export const SURAHS = [
   "Al-Fatihah", "Al-Baqarah", "Aal-E-Imran", "An-Nisa", "Al-Ma'idah", "Al-An'am", "Al-A'raf", "Al-Anfal", "At-Tawbah", "Yunus",
   "Hud", "Yusuf", "Ar-Ra'd", "Ibrahim", "Al-Hijr", "An-Nahl", "Al-Isra", "Al-Kahf", "Maryam", "Ta-Ha",
@@ -150,6 +165,9 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     surah: 'Surah',
     ayah: 'Ayah',
     juz: 'Juz',
+    page: 'Page',
+    pageNo: 'Page No',
+    addPageNo: 'Add Page No',
     target: 'Target',
     progress: 'Progress',
     missedPrayers: 'Missed Prayers',
@@ -269,6 +287,9 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     surah: 'السورة',
     ayah: 'الآية',
     juz: 'الجزء',
+    page: 'الصفحة',
+    pageNo: 'رقم الصفحة',
+    addPageNo: 'إضافة رقم الصفحة',
     target: 'الهدف',
     progress: 'التقدم',
     missedPrayers: 'الصلوات الفائتة',
@@ -388,6 +409,9 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     surah: 'സൂറത്ത്',
     ayah: 'ആയത്ത്',
     juz: 'ജുസ്അ്',
+    page: 'പേജ്',
+    pageNo: 'പേജ് നമ്പർ',
+    addPageNo: 'പേജ് നമ്പർ നൽകുക',
     target: 'ലക്ഷ്യം',
     progress: 'പുരോഗതി',
     missedPrayers: 'നഷ്ടപ്പെട്ട നിസ്കാരങ്ങൾ',
@@ -507,6 +531,9 @@ export const TRANSLATIONS: Record<Language, Record<string, string>> = {
     surah: 'சூரா',
     ayah: 'வசனம்',
     juz: 'ஜுஸ்',
+    page: 'பக்கம்',
+    pageNo: 'பக்க எண்',
+    addPageNo: 'பக்க எண் சேர்க்க',
     target: 'இலக்கு',
     progress: 'முன்னேற்றம்',
     missedPrayers: 'தவறிய தொழுகைகள்',
